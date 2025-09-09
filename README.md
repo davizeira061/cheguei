@@ -2,9 +2,13 @@
 
 Este documento fornece uma visão geral do sistema "Cheguei", com foco na resolução de problemas de login e na configuração correta do ambiente.
 
-## 1. Estrutura da Tabela `usuarios`
+## 1. Estrutura do Banco de Dados
 
-Para que o sistema funcione corretamente, a tabela `usuarios` no seu banco de dados MySQL deve ter a seguinte estrutura. Preste atenção especial à coluna `senha`.
+Para que o sistema funcione corretamente, as tabelas no seu banco de dados MySQL devem ter a seguinte estrutura.
+
+### Tabela `usuarios`
+
+**Importante:** A coluna `senha` **deve** ser do tipo `VARCHAR(255)` para garantir que o hash da senha nunca seja truncado.
 
 **Importante:** A coluna `senha` **deve** ser do tipo `VARCHAR(255)`. O `password_hash()` do PHP gera hashes com cerca de 60 caracteres, mas o comprimento pode aumentar em futuras versões do PHP. Usar `VARCHAR(255)` é a recomendação oficial para garantir que o hash nunca seja truncado.
 
@@ -20,6 +24,27 @@ CREATE TABLE `usuarios` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+### Tabela `pontos`
+
+Esta tabela armazena os registros de ponto. A coluna `tipo` foi atualizada para incluir os registros de almoço.
+
+```sql
+CREATE TABLE `pontos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `data_hora` datetime NOT NULL DEFAULT current_timestamp(),
+  `tipo` enum('entrada','saida_almoco','retorno_almoco','saida') NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `usuario_id` (`usuario_id`),
+  CONSTRAINT `pontos_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+Se você já tinha a tabela criada, pode alterá-la com o seguinte comando:
+```sql
+ALTER TABLE pontos MODIFY COLUMN tipo ENUM('entrada','saida_almoco','retorno_almoco','saida') NOT NULL;
 ```
 
 ## 2. Como Funciona o Login Seguro

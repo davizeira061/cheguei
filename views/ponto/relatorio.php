@@ -1,3 +1,23 @@
+<?php
+function getBadgeClass($tipo) {
+    switch ($tipo) {
+        case 'entrada':
+            return 'bg-success';
+        case 'retorno_almoco':
+            return 'bg-info';
+        case 'saida_almoco':
+            return 'bg-warning';
+        case 'saida':
+            return 'bg-danger';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function formatTipo($tipo) {
+    return ucfirst(str_replace('_', ' ', $tipo));
+}
+?>
 <h1 class="mb-4">Relatório de Pontos</h1>
 
 <div class="card mb-4">
@@ -62,7 +82,7 @@
                         <td><?= htmlspecialchars($ponto['id']) ?></td>
                         <td><?= htmlspecialchars($ponto['usuario_nome']) ?></td>
                         <td><?= date('d/m/Y H:i:s', strtotime($ponto['data_hora'])) ?></td>
-                        <td><span class="badge bg-<?= $ponto['tipo'] === 'entrada' ? 'success' : ($ponto['tipo'] === 'saida' ? 'danger' : 'warning') ?>"><?= ucfirst(htmlspecialchars($ponto['tipo'])) ?></span></td>
+                        <td><span class="badge <?= getBadgeClass($ponto['tipo']) ?>"><?= formatTipo(htmlspecialchars($ponto['tipo'])) ?></span></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
