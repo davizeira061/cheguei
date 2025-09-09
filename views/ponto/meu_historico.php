@@ -24,23 +24,27 @@ function formatTipo($tipo) {
 <?php if (!empty($pontos)): ?>
     <div class="table-responsive">
         <table class="table table-striped table-hover">
-            <thead>
+            <thead class="table-light">
                 <tr>
-                    <th>ID Ponto</th>
                     <th>Data/Hora</th>
                     <th>Tipo</th>
-                    <th>Endereço IP</th>
-                    <th>Localização</th>
+                    <th>Endereço Registrado</th>
+                    <th>Fonte</th>
+                    <th>IP</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($pontos as $ponto): ?>
                     <tr>
-                        <td><?= htmlspecialchars($ponto['id']) ?></td>
                         <td><?= date('d/m/Y H:i:s', strtotime($ponto['data_hora'])) ?></td>
                         <td><span class="badge <?= getBadgeClass($ponto['tipo']) ?>"><?= formatTipo(htmlspecialchars($ponto['tipo'])) ?></span></td>
-                        <td><?= htmlspecialchars($ponto['ip_address'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars($ponto['location'] ?? 'N/A') ?></td>
+                        <td>
+                            <span class="badge bg-<?= ($ponto['location_source'] ?? 'ip') === 'browser' ? 'primary' : 'secondary' ?>">
+                                <?= htmlspecialchars(strtoupper($ponto['location_source'] ?? 'ip')) ?>
+                            </span>
+                        </td>
+                        <td><?= htmlspecialchars($ponto['ip_address'] ?? 'N/A') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

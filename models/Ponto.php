@@ -7,14 +7,19 @@ class Ponto {
         $this->pdo = $pdo;
     }
 
-    public function registerPonto($usuario_id, $tipo, $ip_address, $location) {
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO pontos (usuario_id, data_hora, tipo, ip_address, location) VALUES (:usuario_id, NOW(), :tipo, :ip_address, :location)"
-        );
+    public function registerPonto($usuario_id, $tipo, $ip_address, $location_source, $latitude, $longitude, $location) {
+        $sql = "INSERT INTO pontos (usuario_id, data_hora, tipo, ip_address, location_source, latitude, longitude, location)
+                VALUES (:usuario_id, NOW(), :tipo, :ip_address, :location_source, :latitude, :longitude, :location)";
+
+        $stmt = $this->pdo->prepare($sql);
+
         return $stmt->execute([
             'usuario_id' => $usuario_id,
             'tipo' => $tipo,
             'ip_address' => $ip_address,
+            'location_source' => $location_source,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
             'location' => $location
         ]);
     }
