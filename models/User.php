@@ -65,22 +65,10 @@ class User {
     public function verifyPassword($email, $password) {
         $user = $this->findByEmail($email);
 
-        echo "DEBUG: Email recebido: " . htmlspecialchars($email) . "<br>";
-        echo "DEBUG: Senha recebida (texto puro): " . htmlspecialchars($password) . "<br>";
-
-        if ($user) {
-            echo "DEBUG: Usuário encontrado no DB: " . htmlspecialchars($user['email']) . "<br>";
-            echo "DEBUG: Hash da senha no DB: " . htmlspecialchars($user['senha']) . "<br>";
-
-            if (password_verify($password, $user['senha'])) {
-                echo "DEBUG: password_verify RETORNOU TRUE! Login bem-sucedido!<br>";
-                return $user;
-            } else {
-                echo "DEBUG: password_verify RETORNOU FALSE! Senha não confere.<br>";
-            }
-        } else {
-            echo "DEBUG: Usuário NÃO encontrado para o email: " . htmlspecialchars($email) . "<br>";
+        if ($user && password_verify($password, $user['senha'])) {
+            return $user;
         }
+
         return false;
     }
 }

@@ -2,7 +2,7 @@
 
 <h1 class="mb-4">Gerenciar Usuários</h1>
 
-<a href="/cheguei/admin/users/create" class="btn btn-primary mb-3">Adicionar Novo Usuário</a>
+<a href="<?= BASE_URL ?>/admin/users/create" class="btn btn-primary mb-3">Adicionar Novo Usuário</a>
 
 <?php if (!empty($users)): ?>
     <div class="table-responsive">
@@ -24,8 +24,8 @@
                         <td><?= htmlspecialchars($user['email']) ?></td>
                         <td><span class="badge <?= $user['perfil'] === 'admin' ? 'bg-info' : 'bg-secondary' ?>"><?= ucfirst(htmlspecialchars($user['perfil'])) ?></span></td>
                         <td>
-                            <a href="/cheguei/admin/users/edit?id=<?= htmlspecialchars($user['id']) ?>" class="btn btn-sm btn-warning me-2">Editar</a>
-                            <a href="/cheguei/admin/users/delete?id=<?= htmlspecialchars($user['id']) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">Excluir</a>
+                            <a href="<?= BASE_URL ?>/admin/users/edit?id=<?= htmlspecialchars($user['id']) ?>" class="btn btn-sm btn-warning me-2">Editar</a>
+                            <a href="<?= BASE_URL ?>/admin/users/delete?id=<?= htmlspecialchars($user['id']) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">Excluir</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
