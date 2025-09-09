@@ -16,36 +16,50 @@ class PontoController extends BaseController {
     }
 
     public function registrar() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('/dashboard');
+            return;
+        }
+
+        try {
             $userId = $_SESSION['user_id'];
             $tipo = $_POST['tipo'] ?? '';
 
-            if (in_array($tipo, ['entrada', 'saida_almoco', 'retorno_almoco', 'saida'])) {
-                $ip_address = $this->getUserIP();
-                $location_source = $_POST['location_source'] ?? 'ip';
-                $latitude = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
-                $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
-                $location = 'N/A';
-
-                if ($location_source === 'browser' && $latitude && $longitude) {
-                    $location = $this->getAddressFromCoordinates($latitude, $longitude);
-                } else {
-                    $location = $this->getLocationFromIP($ip_address);
-                    $location_source = 'ip'; // Garante que a fonte seja 'ip' se o fallback for usado
-                }
-
-                if ($this->pontoModel->registerPonto($userId, $tipo, $ip_address, $location_source, $latitude, $longitude, $location)) {
-                    $_SESSION['success_message'] = "Ponto de '{$tipo}' registrado com sucesso!";
-                } else {
-                    $_SESSION['error_message'] = 'Erro ao registrar ponto.';
-                }
-            } else {
+            if (!in_array($tipo, ['entrada', 'saida_almoco', 'retorno_almoco', 'saida'])) {
                 $_SESSION['error_message'] = "Tipo de registro inválido.";
+                $this->redirect('/dashboard');
+                return;
             }
-            $this->redirect('/dashboard');
-        } else {
-            $this->redirect('/dashboard');
+
+            $ip_address = $this->getUserIP();
+            $location_source = $_POST['location_source'] ?? 'ip';
+            $latitude = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
+            $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+            $location = 'N/A';
+
+            if ($location_source === 'browser' && $latitude && $longitude) {
+                $location = $this->getAddressFromCoordinates($latitude, $longitude);
+            } else {
+                $location = $this->getLocationFromIP($ip_address);
+                $location_source = 'ip';
+            }
+
+            if ($this->pontoModel->registerPonto($userId, $tipo, $ip_address, $location_source, $latitude, $longitude, $location)) {
+                $_SESSION['success_message'] = "Ponto de '{$tipo}' registrado com sucesso!";
+            } else {
+                $_SESSION['error_message'] = 'Erro desconhecido ao tentar registrar o ponto.';
+            }
+
+        } catch (PDOException $e) {
+            // Em um ambiente de produção, logar o erro em vez de exibi-lo.
+            // error_log("Erro de banco de dados: " . $e->getMessage());
+            $_SESSION['error_message'] = 'Erro no Banco de Dados: Não foi possível registrar o ponto. Verifique se a estrutura da tabela `pontos` está correta.';
+        } catch (Exception $e) {
+            // error_log("Erro geral: " . $e->getMessage());
+            $_SESSION['error_message'] = 'Ocorreu um erro inesperado. Por favor, tente novamente.';
         }
+
+        $this->redirect('/dashboard');
     }
 
     private function getUserIP() {
@@ -58,13 +72,17 @@ class PontoController extends BaseController {
     }
 
     private function getAddressFromCoordinates($lat, $lon) {
+        if (!function_exists('curl_init')) {
+            return "Localização indisponível (cURL não habilitado no servidor)";
+        }
+
         $url = "https://nominatim.openstreetmap.org/reverse?format=json&lat={$lat}&lon={$lon}&addressdetails=1";
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         // É crucial definir um User-Agent para o Nominatim
-        curl_setopt($ch, CURLOPT_USERAGENT, 'ChegueiApp/1.0 (seu-email@exemplo.com)');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'ChegueiApp/1.0 (contato@seusite.com)');
         $response = curl_exec($ch);
         curl_close($ch);
 
