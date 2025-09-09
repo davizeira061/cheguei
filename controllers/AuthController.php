@@ -27,15 +27,27 @@ class AuthController extends BaseController {
             $email = $_POST['email'] ?? '';
             $senha = $_POST['senha'] ?? '';
 
-            $user = $this->userModel->verifyPassword($email, $senha);
+            $user = $this->userModel->findByEmail($email);
 
-            if ($user) {
+            if ($user && password_verify($senha, $user['senha'])) {
+                // Login bem-sucedido
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_nome'] = $user['nome'];
                 $_SESSION['user_perfil'] = $user['perfil'];
                 $this->redirect('/dashboard');
             } else {
+                // Falha no login
+                // O erro genérico é o mais seguro para produção.
                 $_SESSION['error_message'] = 'Email ou senha incorretos.';
+
+                // Para depuração, podemos verificar se o usuário foi encontrado mas a senha falhou.
+                // Isto sugere um problema com o hash da senha (ex: coluna do DB muito curta).
+                if ($user) {
+                    // Não mostre esta mensagem para o usuário final em produção.
+                    // Apenas para ajudar no diagnóstico do problema atual.
+                    error_log("Login falhou para o usuário '{$email}': A senha não confere. Verifique se a coluna 'senha' no DB é VARCHAR(255).");
+                }
+
                 $this->redirect('/login');
             }
         } else {
