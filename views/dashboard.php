@@ -1,5 +1,3 @@
-<?php include __DIR__ . '/../includes/header.php'; ?>
-
 <div class="jumbotron bg-light p-5 rounded-lg m-3">
     <h1 class="display-4">Bem-vindo(a), <?= htmlspecialchars($user['nome']) ?>!</h1>
     <p class="lead">Seu perfil: <?= htmlspecialchars($user['perfil']) ?>.</p>
@@ -53,5 +51,3 @@
         </div>
     <?php endif; ?>
 </div>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>

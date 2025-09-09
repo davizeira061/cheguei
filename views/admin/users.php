@@ -1,5 +1,3 @@
-<?php include __DIR__ . '/../includes/header.php'; ?>
-
 <h1 class="mb-4">Gerenciar Usuários</h1>
 
 <a href="<?= BASE_URL ?>/admin/users/create" class="btn btn-primary mb-3">Adicionar Novo Usuário</a>
@@ -37,5 +35,3 @@
         Nenhum usuário cadastrado ainda.
     </div>
 <?php endif; ?>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -1,5 +1,3 @@
-<?php include __DIR__ . '/../includes/header.php'; ?>
-
 <h1 class="mb-4"><?= isset($user) && $user ? 'Editar Usuário' : 'Criar Novo Usuário' ?></h1>
 
 <div class="card">
@@ -35,5 +33,3 @@
         </form>
     </div>
 </div>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>

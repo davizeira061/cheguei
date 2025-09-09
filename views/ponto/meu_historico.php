@@ -1,5 +1,3 @@
-<?php include __DIR__ . '/../includes/header.php'; ?>
-
 <h1 class="mb-4">Meu Histórico de Pontos</h1>
 
 <?php if (!empty($pontos)): ?>
@@ -28,5 +26,3 @@
         Nenhum ponto registrado no seu histórico ainda.
     </div>
 <?php endif; ?>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
