@@ -5,42 +5,46 @@
     <p>Aqui você pode registrar seu ponto e acessar suas funcionalidades.</p>
 
     <?php if ($user['perfil'] === 'colaborador'): ?>
-        <h2 class="mt-5">Registrar Ponto</h2>
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title">Marcações Simples</h5>
-                        <form action="<?= BASE_URL ?>/ponto/registrar" method="POST" class="d-inline p-1">
-                            <input type="hidden" name="tipo" value="entrada">
-                            <button type="submit" class="btn btn-success">Registrar Entrada</button>
-                        </form>
-                        <form action="<?= BASE_URL ?>/ponto/registrar" method="POST" class="d-inline p-1">
-                            <input type="hidden" name="tipo" value="saida">
-                            <button type="submit" class="btn btn-danger">Registrar Saída</button>
-                        </form>
+        <h2 class="mt-5 mb-4 text-center">Registrar Ponto</h2>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-5 col-lg-4">
+                <div class="card shadow-sm text-center h-100">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title mb-4">Marcações Simples</h5>
+                        <div class="d-grid gap-3">
+                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                                <input type="hidden" name="tipo" value="entrada">
+                                <button type="submit" class="btn btn-success btn-lg w-100">Registrar Entrada</button>
+                            </form>
+                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                                <input type="hidden" name="tipo" value="saida">
+                                <button type="submit" class="btn btn-danger btn-lg w-100">Registrar Saída</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title">Marcações de Almoço</h5>
-                        <form action="<?= BASE_URL ?>/ponto/registrar" method="POST" class="d-inline p-1">
-                            <input type="hidden" name="tipo" value="saida_almoco">
-                            <button type="submit" class="btn btn-warning">Saída Almoço</button>
-                        </form>
-                        <form action="<?= BASE_URL ?>/ponto/registrar" method="POST" class="d-inline p-1">
-                            <input type="hidden" name="tipo" value="retorno_almoco">
-                            <button type="submit" class="btn btn-info">Retorno Almoço</button>
-                        </form>
+            <div class="col-md-5 col-lg-4">
+                <div class="card shadow-sm text-center h-100">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title mb-4">Marcações de Almoço</h5>
+                        <div class="d-grid gap-3">
+                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                                <input type="hidden" name="tipo" value="saida_almoco">
+                                <button type="submit" class="btn btn-warning btn-lg w-100">Saída Almoço</button>
+                            </form>
+                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                                <input type="hidden" name="tipo" value="retorno_almoco">
+                                <button type="submit" class="btn btn-info btn-lg w-100">Retorno Almoço</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="mt-5">
-             <a href="<?= BASE_URL ?>/ponto/meu_historico" class="btn btn-primary">Ver Meu Histórico de Pontos</a>
+            <a href="<?= BASE_URL ?>/ponto/meu_historico" class="btn btn-primary">Ver Meu Histórico de Pontos</a>
         </div>
 
     <?php elseif ($user['perfil'] === 'admin'): ?>
