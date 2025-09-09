@@ -29,6 +29,8 @@ function formatTipo($tipo) {
                     <th>ID Ponto</th>
                     <th>Data/Hora</th>
                     <th>Tipo</th>
+                    <th>Endereço IP</th>
+                    <th>Localização</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,6 +39,8 @@ function formatTipo($tipo) {
                         <td><?= htmlspecialchars($ponto['id']) ?></td>
                         <td><?= date('d/m/Y H:i:s', strtotime($ponto['data_hora'])) ?></td>
                         <td><span class="badge <?= getBadgeClass($ponto['tipo']) ?>"><?= formatTipo(htmlspecialchars($ponto['tipo'])) ?></span></td>
+                        <td><?= htmlspecialchars($ponto['ip_address'] ?? 'N/A') ?></td>
+                        <td><?= htmlspecialchars($ponto['location'] ?? 'N/A') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

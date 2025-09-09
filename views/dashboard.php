@@ -12,11 +12,11 @@
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title mb-4">Marcações Simples</h5>
                         <div class="d-grid gap-3">
-                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                            <form class="registro-ponto-form" action="<?= BASE_URL ?>/ponto/registrar" method="POST">
                                 <input type="hidden" name="tipo" value="entrada">
                                 <button type="submit" class="btn btn-success btn-lg w-100">Registrar Entrada</button>
                             </form>
-                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                            <form class="registro-ponto-form" action="<?= BASE_URL ?>/ponto/registrar" method="POST">
                                 <input type="hidden" name="tipo" value="saida">
                                 <button type="submit" class="btn btn-danger btn-lg w-100">Registrar Saída</button>
                             </form>
@@ -29,11 +29,11 @@
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title mb-4">Marcações de Almoço</h5>
                         <div class="d-grid gap-3">
-                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                            <form class="registro-ponto-form" action="<?= BASE_URL ?>/ponto/registrar" method="POST">
                                 <input type="hidden" name="tipo" value="saida_almoco">
                                 <button type="submit" class="btn btn-warning btn-lg w-100">Saída Almoço</button>
                             </form>
-                            <form action="<?= BASE_URL ?>/ponto/registrar" method="POST">
+                            <form class="registro-ponto-form" action="<?= BASE_URL ?>/ponto/registrar" method="POST">
                                 <input type="hidden" name="tipo" value="retorno_almoco">
                                 <button type="submit" class="btn btn-info btn-lg w-100">Retorno Almoço</button>
                             </form>
@@ -54,4 +54,23 @@
             <a href="<?= BASE_URL ?>/admin/relatorio" class="list-group-item list-group-item-action">Ver Relatórios de Ponto</a>
         </div>
     <?php endif; ?>
+</div>
+
+<!-- Modal de Confirmação -->
+<div class="modal fade" id="confirmacaoModal" tabindex="-1" aria-labelledby="confirmacaoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmacaoModalLabel">Confirmar Registro</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Deseja realmente registrar este ponto?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-confirmar-registro">Confirmar</button>
+      </div>
+    </div>
+  </div>
 </div>

@@ -21,7 +21,11 @@ class PontoController extends BaseController {
             $tipo = $_POST['tipo'] ?? '';
 
             if (in_array($tipo, ['entrada', 'saida_almoco', 'retorno_almoco', 'saida'])) {
-                if ($this->pontoModel->registerPonto($userId, $tipo)) {
+                // Obter IP e localização
+                $ip_address = $this->getUserIP();
+                $location = $this->getLocationFromIP($ip_address);
+
+                if ($this->pontoModel->registerPonto($userId, $tipo, $ip_address, $location)) {
                     $_SESSION['success_message'] = "Ponto de '{$tipo}' registrado com sucesso!";
                 } else {
                     $_SESSION['error_message'] = 'Erro ao registrar ponto.';
@@ -33,6 +37,48 @@ class PontoController extends BaseController {
         } else {
             $this->redirect('/dashboard');
         }
+    }
+
+    private function getUserIP() {
+        $ip = $_SERVER['REMOTE_ADDR'];
+
+        // Para testes em ambiente local, pode retornar '::1' ou '127.0.0.1'
+        // Usamos um IP público para fins de teste de geolocalização.
+        if ($ip == '::1' || $ip == '127.0.0.1') {
+            return '8.8.8.8'; // IP público do Google para teste
+        }
+
+        return $ip;
+    }
+
+    private function getLocationFromIP($ip) {
+        // Evita fazer requisições para IPs inválidos ou locais
+        if (!filter_var($ip, FILTER_VALIDATE_IP) || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return "Localização indisponível (IP privado ou inválido)";
+        }
+
+        try {
+            // Usar @ para suprimir warnings em caso de falha na requisição
+            $response = @file_get_contents("http://ip-api.com/json/{$ip}?lang=pt-BR");
+
+            if ($response === false) {
+                return "Não foi possível obter a localização";
+            }
+
+            $data = json_decode($response, true);
+
+            if ($data && $data['status'] == 'success') {
+                $city = $data['city'] ?? 'N/A';
+                $region = $data['regionName'] ?? 'N/A';
+                $country = $data['country'] ?? 'N/A';
+                return "{$city}, {$region}, {$country}";
+            }
+        } catch (Exception $e) {
+            // Em um ambiente de produção, seria bom logar o erro.
+            return "Erro ao buscar localização";
+        }
+
+        return "Localização não encontrada";
     }
 
     public function meuHistorico() {
