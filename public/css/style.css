@@ -1,0 +1,16 @@
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.container {
+    flex: 1; /* Faz o container principal ocupar o espaço restante */
+}
+
+footer {
+    width: 100%;
+    margin-top: auto; /* Empurra o footer para baixo */
+}
+
+/* Estilos para badges e outros elementos Bootstrap podem ser sobrescritos aqui */
