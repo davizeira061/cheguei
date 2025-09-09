@@ -1,4 +1,23 @@
-<?php include __DIR__ . '/../includes/header.php'; ?>
+<?php
+function getBadgeClass($tipo) {
+    switch ($tipo) {
+        case 'entrada':
+            return 'bg-success';
+        case 'retorno_almoco':
+            return 'bg-info';
+        case 'saida_almoco':
+            return 'bg-warning';
+        case 'saida':
+            return 'bg-danger';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function formatTipo($tipo) {
+    return ucfirst(str_replace('_', ' ', $tipo));
+}
+?>
 
 <h1 class="mb-4">Meu Histórico de Pontos</h1>
 
@@ -17,7 +36,7 @@
                     <tr>
                         <td><?= htmlspecialchars($ponto['id']) ?></td>
                         <td><?= date('d/m/Y H:i:s', strtotime($ponto['data_hora'])) ?></td>
-                        <td><span class="badge <?= $ponto['tipo'] === 'entrada' ? 'bg-success' : 'bg-danger' ?>"><?= ucfirst(htmlspecialchars($ponto['tipo'])) ?></span></td>
+                        <td><span class="badge <?= getBadgeClass($ponto['tipo']) ?>"><?= formatTipo(htmlspecialchars($ponto['tipo'])) ?></span></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -28,5 +47,3 @@
         Nenhum ponto registrado no seu histórico ainda.
     </div>
 <?php endif; ?>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>

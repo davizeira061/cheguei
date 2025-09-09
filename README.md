@@ -1,164 +1,101 @@
 # Cheguei - Sistema de Registro de Ponto
 
-Um sistema web completo para registro de ponto, desenvolvido em PHP 8 com MySQL, focado em usabilidade e responsividade.
+Este documento fornece uma visão geral do sistema "Cheguei", com foco na resolução de problemas de login e na configuração correta do ambiente.
 
-## Funcionalidades
+## 1. Estrutura do Banco de Dados
 
-- **Autenticação Segura:** Login com email e senha (hashes criptográficos).
-- **Controle de Sessão:** Acesso restrito a usuários logados.
-- **Perfis de Acesso:**
-    - **Administrador:** Gerencia usuários (cria, edita, exclui) e visualiza/exporta todos os registros de ponto.
-    - **Colaborador:** Registra entradas e saídas de ponto, e visualiza seu próprio histórico.
-- **Registro de Ponto:**
-    - Batidas de ponto com registro automático de data e hora.
-    - Tipos de registro: Entrada e Saída.
-- **Relatórios:**
-    - Filtragem por usuário, data inicial e data final.
-    - Exibição do total de horas trabalhadas no período selecionado.
-    - Exportação em CSV. (Exportação em PDF requer bibliotecas externas e não está implementada nesta versão básica).
-- **Interface Responsiva:** Desenvolvida com Bootstrap 5 para ótima experiência em desktops e dispositivos móveis.
-- **Estrutura de Código:** Organizado em um padrão MVC simples para facilitar manutenção.
+Para que o sistema funcione corretamente, as tabelas no seu banco de dados MySQL devem ter a seguinte estrutura.
 
-## Requisitos Mínimos
+### Tabela `usuarios`
 
-- **PHP 8.0 ou superior:**
-    - Extensão `php_pdo_mysql` habilitada.
-    - Extensão `php_openssl` (geralmente habilitada por padrão).
-- **MySQL 5.7 ou superior:** Ou MariaDB equivalente.
-- **Servidor Web:** Apache (com `mod_rewrite` habilitado) ou Nginx.
+**Importante:** A coluna `senha` **deve** ser do tipo `VARCHAR(255)` para garantir que o hash da senha nunca seja truncado.
 
-## Instalação e Configuração
+**Importante:** A coluna `senha` **deve** ser do tipo `VARCHAR(255)`. O `password_hash()` do PHP gera hashes com cerca de 60 caracteres, mas o comprimento pode aumentar em futuras versões do PHP. Usar `VARCHAR(255)` é a recomendação oficial para garantir que o hash nunca seja truncado.
 
-Siga os passos abaixo para colocar o projeto em funcionamento:
-
-### 1. Clonar o Repositório (ou Baixar o Projeto)
-
-Assumindo que você vai clonar para dentro do diretório `htdocs` (Apache) ou equivalente:
-
-'```bash
-git clone <URL_DO_SEU_REPOSITORIO> cheguei
-cd cheguei
-'
-### 2. Configuração do Banco de Dados
-
-Crie um banco de dados MySQL com o nome cheguei_db.
-Em seguida, execute as seguintes instruções SQL para criar as tabelas usuarios e pontos:
-
--- Tabela `usuarios`
+```sql
 CREATE TABLE `usuarios` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `nome` VARCHAR(255) NOT NULL,
-    `email` VARCHAR(255) NOT NULL UNIQUE,
-    `senha` VARCHAR(255) NOT NULL,
-    `perfil` ENUM('admin', 'colaborador') DEFAULT 'colaborador',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nome` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `senha` varchar(255) NOT NULL, -- Essencial que seja VARCHAR(255)
+  `perfil` enum('admin','colaborador') DEFAULT 'colaborador',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
 
--- Tabela `pontos`
+### Tabela `pontos`
+
+Esta tabela armazena os registros de ponto. A coluna `tipo` foi atualizada para incluir os registros de almoço.
+
+```sql
 CREATE TABLE `pontos` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `usuario_id` INT NOT NULL,
-    `data_hora` DATETIME NOT NULL,
-    `tipo` ENUM('entrada', 'saida') NOT NULL,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`usuario_id`) REFERENCES `usuarios`(`id`) ON DELETE CASCADE
-);
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(11) NOT NULL,
+  `data_hora` datetime NOT NULL DEFAULT current_timestamp(),
+  `tipo` enum('entrada','saida_almoco','retorno_almoco','saida') NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `usuario_id` (`usuario_id`),
+  CONSTRAINT `pontos_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
 
--- Inserir um usuário administrador inicial (senha: admin123)
--- A senha 'admin123' será automaticamente hashada pelo sistema no primeiro login ou criação.
--- Para gerar o hash manualmente (antes da primeira execução do sistema), você pode usar um script PHP:
--- echo password_hash('admin123', PASSWORD_DEFAULT);
--- E insira o hash gerado diretamente na base.
--- Como o sistema já cria usuários com hash, vamos fazer com a senha bruta e deixar o sistema lidar com isso.
--- A senha será tratada na primeira autenticação ou na criação via interface.
--- Para o primeiro admin, o ideal é criar via interface de usuário após logar com um admin inicial.
--- Ou, para fins de teste, você pode inserir o hash diretamente:
--- INSERT INTO `usuarios` (`nome`, `email`, `senha`, `perfil`) VALUES
--- ('Administrador Padrão', 'admin@cheguei.com', '$2y$10$seu_hash_da_senha_admin123_aqui', 'admin');
---
--- Por agora, para fins de teste e facilidade, vamos criar o admin via interface.
--- Ou você pode rodar este comando para criar um admin temporário com senha 'admin123' (hashado):
-INSERT INTO `usuarios` (`nome`, `email`, `senha`, `perfil`) VALUES
-('Administrador Inicial', 'admin@cheguei.com', '$2y$10$61v8x7.JqQh2lJ5R7tXy.uO0Y7c8QY5K.p2v9G.l7jY6qXz2k/iK', 'admin'); -- Hash para 'admin123'
+Se você já tinha a tabela criada, pode alterá-la com o seguinte comando:
+```sql
+ALTER TABLE pontos MODIFY COLUMN tipo ENUM('entrada','saida_almoco','retorno_almoco','saida') NOT NULL;
+```
 
-Atualize o arquivo config/database.php com as suas credenciais de banco de dados se forem diferentes de root sem senha.
+## 2. Como Funciona o Login Seguro
 
-### 3. Configuração do Servidor Web (Apache)
-Certifique-se de que o módulo mod_rewrite esteja habilitado no Apache.
-Crie ou edite o arquivo .htaccess na raiz do projeto (cheguei/.htaccess) com o conteúdo fornecido:
+O processo de login foi projetado para ser seguro, seguindo as melhores práticas do PHP.
 
-Apache
-# .htaccess na raiz do projeto 'cheguei/'
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ public/index.php [QSA,L]
+1.  **Criação do Usuário:** Quando um novo usuário é criado (seja pelo sistema ou por um script), a senha fornecida **não é salva em texto puro**. Ela é processada pela função `password_hash()`, que a transforma em um hash criptográfico seguro.
 
-Importante: Se você estiver utilizando um virtual host, a configuração AllowOverride All deve estar ativa para o diretório do projeto. Se estiver em um subdiretório sem virtual host, pode ser necessário ajustar as regras de reescrita para incluir o nome do subdiretório (ex: RewriteBase /cheguei/). O index.php do public já tenta lidar com o subdiretório.
+2.  **Tentativa de Login:** Quando um usuário tenta fazer login:
+    *   O sistema primeiro busca o usuário no banco de dados pelo `email`.
+    *   Se o usuário existe, o sistema usa a função `password_verify()` para comparar a senha digitada no formulário com o hash que está salvo no banco de dados.
+    *   `password_verify()` é uma função segura que sabe como comparar uma string de texto puro com um hash gerado por `password_hash()`.
+    *   Se a comparação for bem-sucedida, o login é autorizado. Caso contrário, é negado.
 
-4. Acessar o Projeto
-Após a configuração, você pode acessar o sistema no seu navegador:
-http://localhost/cheguei/
-Você será redirecionado para a tela de login.
-Usuário e Senha Padrão do Administrador Inicial
-Email: admin@cheguei.com
-Senha: admin123
+## 3. Como Criar um Usuário Administrador (Via Script)
 
-Recomendação: Altere a senha do administrador após o primeiro login para maior segurança.
-Como Utilizar o Sistema
-Login
-Acesse a URL base do projeto (ex: http://localhost/cheguei/).
-Digite o email e a senha do administrador inicial ou de um colaborador.
-Clique em "Entrar".
-Dashboard
-Após o login, você será direcionado para o dashboard.
-Colaborador: Verá opções para "Registrar Entrada" e "Registrar Saída", além de um resumo dos seus últimos pontos.
-Administrador: Verá links para "Gerenciar Usuários" e "Ver Relatórios de Ponto".
-Registrar Ponto (Colaborador)
-No dashboard, clique em "Registrar Entrada" ou "Registrar Saída".
-Uma mensagem de sucesso aparecerá e o ponto será registrado com a data e hora atuais.
-Seu histórico será atualizado.
-Gerenciar Usuários (Administrador)
-No dashboard, clique em "Gerenciar Usuários" ou navegue para http://localhost/cheguei/admin/users.
-Você verá uma lista de todos os usuários.
-Adicionar Novo Usuário: Clique no botão "Adicionar Novo Usuário". Preencha os dados (nome, email, senha, perfil) e clique em "Criar Usuário".
-Editar Usuário: Clique no botão "Editar" ao lado do usuário desejado. Altere as informações e clique em "Salvar Alterações". Se deixar o campo de senha em branco, a senha atual não será alterada.
-Excluir Usuário: Clique no botão "Excluir" ao lado do usuário desejado. Confirme a exclusão.
-Relatórios de Ponto (Administrador)
-No dashboard, clique em "Ver Relatórios de Ponto" ou navegue para http://localhost/cheguei/ponto/relatorio.
-Use os filtros "Usuário", "Data Inicial" e "Data Final" para refinar os resultados.
-Clique em "Filtrar" para aplicar os filtros.
-O total de horas trabalhadas para o período e usuário selecionados será exibido.
-Exportar CSV: Clique em "Exportar CSV" para baixar o relatório em formato de planilha.
-Exportar PDF: Esta funcionalidade não está implementada nesta versão básica e exigiria a inclusão de uma biblioteca PHP externa (ex: DomPDF).
-Considerações sobre Segurança
-Senhas: As senhas são armazenadas com password_hash() para maior segurança.
-Injeção SQL: O uso de Prepared Statements com PDO previne ataques de injeção SQL.
-XSS: A saída de dados HTML para as views usa htmlspecialchars() para mitigar XSS.
-Sessões: As sessões são gerenciadas pelo PHP, mas considere usar configurações mais seguras de sessão em ambiente de produção (ex: cookies somente HTTP, tempo de vida da sessão).
-Melhorias Futuras (Opcionais)
-Implementação completa da exportação em PDF.
-Recuperação de senha.
-Verificação de email para novos usuários.
-Interface de usuário para alterar a própria senha.
-Controle mais granular de permissões (além de admin/colaborador).
-Registro de ponto com geolocalização.
-Testes unitários e de integração.
-Containerização (Docker).
+Para facilitar a configuração inicial, foi criado um script que insere um usuário administrador com dados padrão. Para executá-lo, siga os passos:
 
----
+1.  **Configure o Banco de Dados:** Certifique-se de que o arquivo `config/database.php` contém as credenciais corretas do seu banco de dados.
 
-**Observações Finais:**
+2.  **Execute o Script pela Linha de Comando:** Abra seu terminal, navegue até a pasta raiz do projeto e execute o seguinte comando:
 
-1.  **Imagens:** O sistema em si não gera imagens de forma dinâmica. Se você quiser um wireframe ou um mockup visual, me diga! Por exemplo: "Gere um mockup da tela de login do sistema 'Cheguei'".
+    ```bash
+    php scripts/create_admin.php
+    ```
 
-2.  **HTML/CSS/JS:** Os arquivos `style.css` e `script.js` em `public/` estão vazios. Você pode adicionar seu CSS personalizado e JavaScript para interatividade, se necessário, além do Bootstrap.
+3.  **Verifique a Saída:** O script irá confirmar a criação do usuário ou informará se um usuário com o mesmo email já existe.
 
-3.  **Exportação PDF:** Conforme mencionado no `README.md` e no controlador, a exportação para PDF é mais complexa e exigiria uma biblioteca como [DomPDF](https://github.com/dompdf/dompdf) ou [FPDF](http://www.fpdf.org/). O código atual apenas mostra uma mensagem de erro.
+    **Credenciais do Admin Padrão:**
+    *   **Email:** `admin@example.com`
+    *   **Senha:** `123456`
 
-4.  **UX/UI:** O layout é simples e segue o Bootstrap 5. Para otimização mobile, o Bootstrap já ajuda bastante, mas ajustes finos no CSS podem ser necessários dependendo da complexidade do design.
+## 4. Resolvendo Erros Comuns de Login
 
-5.  **Subdiretório:** Se o projeto não for a raiz do seu servidor virtual host, e estiver em `http://localhost/cheguei/`, o `public/index.php` e os links `href` nos headers já estão configurados para `'/cheguei/'`. Se for outro nome, você precisará ajustar.
+Se você está recebendo a mensagem "Email ou senha inválidos" mesmo com as credenciais corretas, aqui estão as causas mais comuns e como resolvê-las.
 
-Este é um sistema bem robusto para começar!
+### Causa nº 1: Hash da Senha Truncado (O Mais Provável)
+
+-   **Problema:** A coluna `senha` na sua tabela `usuarios` é muito curta (ex: `VARCHAR(60)`). Quando o `password_hash()` gera uma string longa, o banco de dados a corta para caber na coluna. O hash armazenado fica incompleto e `password_verify()` nunca encontrará uma correspondência.
+-   **Solução:** Altere a estrutura da sua tabela para que a coluna `senha` seja `VARCHAR(255)`.
+    ```sql
+    ALTER TABLE usuarios MODIFY COLUMN senha VARCHAR(255) NOT NULL;
+    ```
+    Depois de alterar a coluna, você precisará **recriar o usuário** (seja pelo script ou pela interface) para que a senha seja hasheada e armazenada corretamente no novo campo.
+
+### Causa nº 2: Senha em Texto Puro no Banco
+
+-   **Problema:** Você inseriu um usuário diretamente no banco de dados com a senha em texto puro (ex: '123456'). O `password_verify()` espera um hash e não saberá como comparar com texto puro.
+-   **Solução:** Nunca insira senhas em texto puro. Use sempre o script `create_admin.php` ou a interface do sistema para criar usuários, pois eles garantem que a senha seja processada com `password_hash()`.
+
+### Causa nº 3: Espaços Extras ou Problemas de Charset
+
+-   **Problema:** Ao copiar e colar o email ou a senha, espaços extras podem ter sido inseridos no banco de dados ou no formulário de login.
+-   **Solução:** Verifique os dados no banco de dados em busca de espaços no início ou no fim dos emails. No código, o uso de `trim()` pode ajudar a mitigar isso, embora a versão atual do código não o faça explicitamente. A configuração `charset=utf8mb4` no arquivo `config/database.php` já ajuda a prevenir problemas de codificação de caracteres.
