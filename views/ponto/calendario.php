@@ -118,7 +118,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Se o filtro de usuário existir, adiciona um listener para recarregar os eventos
     if (userSelect) {
-        userSelect.addEventListener('change', function() {
+        // Usando jQuery para maior compatibilidade, já que está presente na página
+        $(userSelect).on('change', function() {
             // Remove a fonte de eventos antiga
             calendar.getEventSources().forEach(source => source.remove());
             // Adiciona a nova fonte de eventos com o ID do usuário selecionado
