@@ -59,7 +59,9 @@ document.addEventListener('DOMContentLoaded', function() {
         url: '<?= BASE_URL ?>/ponto/calendarioJson',
         method: 'GET', // Assegura que o método é GET
         extraParams: {
-            usuario_id: userId
+            usuario_id: userId,
+            // Parâmetro para evitar cache da requisição GET
+            _: new Date().getTime()
         },
         failure: function() {
             alert('Houve um erro ao carregar os eventos do calendário!');
