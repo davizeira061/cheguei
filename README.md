@@ -1,101 +1,89 @@
-# Cheguei - Sistema de Registro de Ponto
+# Cheguei - Sistema de Registro de Ponto (Versão 2.0)
 
-Este documento fornece uma visão geral do sistema "Cheguei", com foco na resolução de problemas de login e na configuração correta do ambiente.
+Este documento fornece uma visão geral do sistema "Cheguei", com foco nas novas funcionalidades implementadas e na configuração correta do ambiente.
 
-## 1. Estrutura do Banco de Dados
+## Novas Funcionalidades
+
+A versão 2.0 do sistema introduz melhorias significativas para o cálculo de horas e visualização de dados:
+
+1.  **Cálculo Automático de Horas:** O sistema agora calcula automaticamente as horas trabalhadas por dia, considerando entradas, saídas e pausas para almoço. Registros incompletos (ex: entrada sem saída) são identificados e não são somados no total.
+2.  **Banco de Horas:** O saldo de horas (positivas ou negativas) é calculado diariamente e consolidado por período.
+3.  **Relatórios Avançados:** Uma nova página de relatórios (disponível para administradores) permite filtrar os registros por usuário, intervalo de datas e situação (completo/incompleto). Os dados são apresentados em uma tabela interativa com opções de exportação para **CSV e PDF**.
+4.  **Calendário de Marcações:** Uma nova visualização em calendário permite que os usuários vejam suas marcações mensais. Cada dia exibe o total de horas e o status. Administradores podem filtrar para visualizar o calendário de qualquer funcionário.
+5.  **Histórico Melhorado:** A página "Meu Histórico" para o usuário final foi aprimorada com as mesmas funcionalidades de filtro e cálculo da página de relatórios.
+
+## Estrutura do Banco de Dados
 
 Para que o sistema funcione corretamente, as tabelas no seu banco de dados MySQL devem ter a seguinte estrutura.
 
 ### Tabela `usuarios`
-
-**Importante:** A coluna `senha` **deve** ser do tipo `VARCHAR(255)` para garantir que o hash da senha nunca seja truncado.
-
-**Importante:** A coluna `senha` **deve** ser do tipo `VARCHAR(255)`. O `password_hash()` do PHP gera hashes com cerca de 60 caracteres, mas o comprimento pode aumentar em futuras versões do PHP. Usar `VARCHAR(255)` é a recomendação oficial para garantir que o hash nunca seja truncado.
-
+(A estrutura permanece a mesma)
 ```sql
 CREATE TABLE `usuarios` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `nome` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
-  `senha` varchar(255) NOT NULL, -- Essencial que seja VARCHAR(255)
+  `senha` varchar(255) NOT NULL,
   `perfil` enum('admin','colaborador') DEFAULT 'colaborador',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### Tabela `pontos`
-
-Esta tabela armazena os registros de ponto. A coluna `tipo` foi atualizada para incluir os registros de almoço.
-
+### Tabela `pontos` (Estrutura Atualizada)
+A tabela `pontos` foi estendida para incluir dados de geolocalização.
 ```sql
 CREATE TABLE `pontos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `usuario_id` int(11) NOT NULL,
   `data_hora` datetime NOT NULL DEFAULT current_timestamp(),
   `tipo` enum('entrada','saida_almoco','retorno_almoco','saida') NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `location_source` varchar(20) DEFAULT 'ip',
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL,
+  `location` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `usuario_id` (`usuario_id`),
   CONSTRAINT `pontos_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-Se você já tinha a tabela criada, pode alterá-la com o seguinte comando:
+### **NOVO:** Tabela `resumo_mensal`
+É **necessário** criar esta nova tabela para armazenar os cálculos mensais e o banco de horas.
+
+**Execute o script de migration:** Para criar a tabela, execute o conteúdo do arquivo `scripts/migration_resumo_mensal.sql` no seu banco de dados.
+
 ```sql
-ALTER TABLE pontos MODIFY COLUMN tipo ENUM('entrada','saida_almoco','retorno_almoco','saida') NOT NULL;
+-- Conteúdo de scripts/migration_resumo_mensal.sql
+CREATE TABLE `resumo_mensal` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `usuario_id` INT(11) NOT NULL,
+  `mes_ano` VARCHAR(7) NOT NULL COMMENT 'Formato YYYY-MM',
+  `total_horas_trabalhadas` INT(11) NOT NULL DEFAULT 0 COMMENT 'Total de segundos trabalhados no mês',
+  `banco_horas_saldo` INT(11) NOT NULL DEFAULT 0 COMMENT 'Saldo de segundos do banco de horas no mês',
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_usuario_mes` (`usuario_id`, `mes_ano`),
+  CONSTRAINT `fk_resumo_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-## 2. Como Funciona o Login Seguro
+## Dependências Frontend
 
-O processo de login foi projetado para ser seguro, seguindo as melhores práticas do PHP.
+As novas funcionalidades de relatório e calendário utilizam bibliotecas Javascript, que são carregadas via CDN nos arquivos de cabeçalho e rodapé da aplicação. Nenhuma instalação manual é necessária.
 
-1.  **Criação do Usuário:** Quando um novo usuário é criado (seja pelo sistema ou por um script), a senha fornecida **não é salva em texto puro**. Ela é processada pela função `password_hash()`, que a transforma em um hash criptográfico seguro.
+-   **jQuery**
+-   **DataTables:** Para tabelas interativas e exportação (CSV/PDF).
+-   **FullCalendar:** Para a visualização em calendário.
 
-2.  **Tentativa de Login:** Quando um usuário tenta fazer login:
-    *   O sistema primeiro busca o usuário no banco de dados pelo `email`.
-    *   Se o usuário existe, o sistema usa a função `password_verify()` para comparar a senha digitada no formulário com o hash que está salvo no banco de dados.
-    *   `password_verify()` é uma função segura que sabe como comparar uma string de texto puro com um hash gerado por `password_hash()`.
-    *   Se a comparação for bem-sucedida, o login é autorizado. Caso contrário, é negado.
+## Como Usar
 
-## 3. Como Criar um Usuário Administrador (Via Script)
+1.  **Relatórios (Admin):** Navegue até a página "Relatórios". Selecione um usuário e um período para ver o detalhamento diário de horas, o total trabalhado e o saldo do banco de horas. Use os botões para exportar os dados.
+2.  **Calendário:** Navegue até "Calendário". Admins podem selecionar um usuário para visualizar. Clique em um dia para ver os detalhes das marcações.
+3.  **Meu Histórico (Colaborador):** A página "Meu Histórico" agora funciona como um relatório pessoal, com as mesmas funcionalidades de filtro e cálculo.
 
-Para facilitar a configuração inicial, foi criado um script que insere um usuário administrador com dados padrão. Para executá-lo, siga os passos:
-
-1.  **Configure o Banco de Dados:** Certifique-se de que o arquivo `config/database.php` contém as credenciais corretas do seu banco de dados.
-
-2.  **Execute o Script pela Linha de Comando:** Abra seu terminal, navegue até a pasta raiz do projeto e execute o seguinte comando:
-
-    ```bash
-    php scripts/create_admin.php
-    ```
-
-3.  **Verifique a Saída:** O script irá confirmar a criação do usuário ou informará se um usuário com o mesmo email já existe.
-
-    **Credenciais do Admin Padrão:**
-    *   **Email:** `admin@example.com`
-    *   **Senha:** `123456`
-
-## 4. Resolvendo Erros Comuns de Login
-
-Se você está recebendo a mensagem "Email ou senha inválidos" mesmo com as credenciais corretas, aqui estão as causas mais comuns e como resolvê-las.
-
-### Causa nº 1: Hash da Senha Truncado (O Mais Provável)
-
--   **Problema:** A coluna `senha` na sua tabela `usuarios` é muito curta (ex: `VARCHAR(60)`). Quando o `password_hash()` gera uma string longa, o banco de dados a corta para caber na coluna. O hash armazenado fica incompleto e `password_verify()` nunca encontrará uma correspondência.
--   **Solução:** Altere a estrutura da sua tabela para que a coluna `senha` seja `VARCHAR(255)`.
-    ```sql
-    ALTER TABLE usuarios MODIFY COLUMN senha VARCHAR(255) NOT NULL;
-    ```
-    Depois de alterar a coluna, você precisará **recriar o usuário** (seja pelo script ou pela interface) para que a senha seja hasheada e armazenada corretamente no novo campo.
-
-### Causa nº 2: Senha em Texto Puro no Banco
-
--   **Problema:** Você inseriu um usuário diretamente no banco de dados com a senha em texto puro (ex: '123456'). O `password_verify()` espera um hash e não saberá como comparar com texto puro.
--   **Solução:** Nunca insira senhas em texto puro. Use sempre o script `create_admin.php` ou a interface do sistema para criar usuários, pois eles garantem que a senha seja processada com `password_hash()`.
-
-### Causa nº 3: Espaços Extras ou Problemas de Charset
-
--   **Problema:** Ao copiar e colar o email ou a senha, espaços extras podem ter sido inseridos no banco de dados ou no formulário de login.
--   **Solução:** Verifique os dados no banco de dados em busca de espaços no início ou no fim dos emails. No código, o uso de `trim()` pode ajudar a mitigar isso, embora a versão atual do código não o faça explicitamente. A configuração `charset=utf8mb4` no arquivo `config/database.php` já ajuda a prevenir problemas de codificação de caracteres.
+---
+*(O conteúdo sobre como criar um admin e resolver problemas de login do README anterior ainda é válido e pode ser consultado no histórico do Git se necessário.)*

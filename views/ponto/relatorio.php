@@ -1,95 +1,178 @@
 <?php
-function getBadgeClass($tipo) {
-    switch ($tipo) {
-        case 'entrada':
-            return 'bg-success';
-        case 'retorno_almoco':
-            return 'bg-info';
-        case 'saida_almoco':
-            return 'bg-warning';
-        case 'saida':
-            return 'bg-danger';
+// Helpers para formatação
+function formatarSegundos($total_segundos) {
+    if ($total_segundos < 0) {
+        $sinal = '-';
+        $total_segundos = abs($total_segundos);
+    } else {
+        $sinal = '';
+    }
+    $horas = floor($total_segundos / 3600);
+    $minutos = floor(($total_segundos % 3600) / 60);
+    return sprintf('%s%02d:%02d', $sinal, $horas, $minutos);
+}
+
+function getStatusBadge($status) {
+    switch ($status) {
+        case 'completo':
+            return '<span class="badge bg-success">Completo</span>';
+        case 'incompleto':
+            return '<span class="badge bg-warning text-dark">Incompleto</span>';
         default:
-            return 'bg-secondary';
+            return '<span class="badge bg-secondary">N/A</span>';
     }
 }
 
-function formatTipo($tipo) {
-    return ucfirst(str_replace('_', ' ', $tipo));
+function getSaldoClass($segundos) {
+    if ($segundos > 0) return 'text-success';
+    if ($segundos < 0) return 'text-danger';
+    return 'text-muted';
 }
 ?>
-<h1 class="mb-4">Relatório de Pontos</h1>
 
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/2.0.3/css/dataTables.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.0.1/css/buttons.dataTables.min.css">
+
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/2.0.3/js/dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.0.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.0.1/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.0.1/js/buttons.print.min.js"></script>
+
+<!-- Dependências para exportação -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<h1 class="mb-4">Relatório Geral de Pontos</h1>
+
+<!-- Filtros -->
 <div class="card mb-4">
-    <div class="card-header">
-        Filtros
-    </div>
+    <div class="card-header">Filtros</div>
     <div class="card-body">
         <form action="<?= BASE_URL ?>/admin/relatorio" method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label for="usuario_id" class="form-label">Usuário:</label>
-                <select name="usuario_id" id="usuario_id" class="form-select">
-                    <option value="">Todos</option>
+            <div class="col-md-3">
+                <label for="usuario_id" class="form-label">Usuário</label>
+                <select name="usuario_id" id="usuario_id" class="form-select" required>
+                    <option value="">Selecione...</option>
                     <?php foreach ($users as $u): ?>
-                        <option value="<?= htmlspecialchars($u['id']) ?>" <?= (isset($_GET['usuario_id']) && $_GET['usuario_id'] == $u['id']) ? 'selected' : '' ?>>
+                        <option value="<?= $u['id'] ?>" <?= ($filtros['usuario_id'] == $u['id']) ? 'selected' : '' ?>>
                             <?= htmlspecialchars($u['nome']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-md-3">
-                <label for="start_date" class="form-label">Data Inicial:</label>
-                <input type="date" name="start_date" id="start_date" class="form-control" value="<?= htmlspecialchars($_GET['start_date'] ?? '') ?>">
+                <label for="start_date" class="form-label">Data Inicial</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="<?= htmlspecialchars($filtros['start_date']) ?>">
             </div>
             <div class="col-md-3">
-                <label for="end_date" class="form-label">Data Final:</label>
-                <input type="date" name="end_date" id="end_date" class="form-control" value="<?= htmlspecialchars($_GET['end_date'] ?? '') ?>">
+                <label for="end_date" class="form-label">Data Final</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="<?= htmlspecialchars($filtros['end_date']) ?>">
             </div>
-            <div class="col-md-2 d-grid">
+            <div class="col-md-2">
+                <label for="situacao" class="form-label">Situação</label>
+                <select name="situacao" id="situacao" class="form-select">
+                    <option value="todos" <?= $filtros['situacao'] == 'todos' ? 'selected' : '' ?>>Todos</option>
+                    <option value="completo" <?= $filtros['situacao'] == 'completo' ? 'selected' : '' ?>>Completo</option>
+                    <option value="incompleto" <?= $filtros['situacao'] == 'incompleto' ? 'selected' : '' ?>>Incompleto</option>
+                </select>
+            </div>
+            <div class="col-md-1 d-grid">
                 <button type="submit" class="btn btn-primary">Filtrar</button>
             </div>
         </form>
     </div>
 </div>
 
-<?php if (isset($pontos) && !empty($pontos)): ?>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Resultados:</h3>
-        <div>
-            <a href="<?= BASE_URL ?>/admin/relatorio?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>" class="btn btn-success me-2">Exportar CSV</a>
+<?php if (!empty($filtros['usuario_id'])): ?>
+    <!-- Resumo do Período -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Total de Horas Trabalhadas</h5>
+                    <p class="card-text fs-2"><?= formatarSegundos($resumo['total_segundos_periodo']) ?></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Saldo do Banco de Horas</h5>
+                    <p class="card-text fs-2 <?= getSaldoClass($resumo['banco_horas_saldo_periodo']) ?>">
+                        <?= formatarSegundos($resumo['banco_horas_saldo_periodo']) ?>
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <?php if (isset($total_horas_formatado) && $total_horas_formatado): ?>
-        <div class="alert alert-info mt-3" role="alert">
-            Total de Horas Trabalhadas no Período para o usuário selecionado: <strong><?= htmlspecialchars($total_horas_formatado) ?></strong>
-        </div>
-    <?php endif; ?>
-
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th>ID Ponto</th>
-                    <th>Usuário</th>
-                    <th>Data/Hora</th>
-                    <th>Tipo</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($pontos as $ponto): ?>
+    <!-- Tabela de Resultados -->
+    <div class="card">
+        <div class="card-header">Resultados Detalhados</div>
+        <div class="card-body">
+            <table id="relatorioTable" class="table table-striped table-bordered" style="width:100%">
+                <thead>
                     <tr>
-                        <td><?= htmlspecialchars($ponto['id']) ?></td>
-                        <td><?= htmlspecialchars($ponto['usuario_nome']) ?></td>
-                        <td><?= date('d/m/Y H:i:s', strtotime($ponto['data_hora'])) ?></td>
-                        <td><span class="badge <?= getBadgeClass($ponto['tipo']) ?>"><?= formatTipo(htmlspecialchars($ponto['tipo'])) ?></span></td>
+                        <th>Data</th>
+                        <th>Status</th>
+                        <th>Horas Trabalhadas</th>
+                        <th>Saldo do Dia</th>
+                        <th>Registros</th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php foreach ($resumo['resumo_diario'] as $data => $dia): ?>
+                    <tr>
+                        <td><?= date('d/m/Y', strtotime($data)) ?></td>
+                        <td><?= getStatusBadge($dia['status']) ?></td>
+                        <td><?= formatarSegundos($dia['total_segundos_trabalhados']) ?></td>
+                        <td class="<?= getSaldoClass($dia['banco_horas_saldo']) ?>"><?= formatarSegundos($dia['banco_horas_saldo']) ?></td>
+                        <td>
+                            <?php foreach ($dia['registros'] as $r): ?>
+                                <span class="badge bg-secondary">
+                                    <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $r['tipo']))) ?>
+                                    <?= date('H:i', strtotime($r['data_hora'])) ?>
+                                </span>
+                            <?php endforeach; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 <?php else: ?>
-    <div class="alert alert-info" role="alert">
-        Nenhum registro encontrado para os filtros selecionados.
-    </div>
+    <div class="alert alert-info">Selecione um usuário para gerar o relatório.</div>
 <?php endif; ?>
+
+<!-- Adiciona o script do DataTables -->
+<script>
+$(document).ready(function() {
+    new DataTable('#relatorioTable', {
+        layout: {
+            topStart: {
+                buttons: [
+                    {
+                        extend: 'csv',
+                        text: 'Exportar CSV'
+                    },
+                    {
+                        extend: 'pdf',
+                        text: 'Exportar PDF'
+                    }
+                ]
+            }
+        },
+        language: {
+            url: '//cdn.datatables.net/plug-ins/2.0.3/i18n/pt-BR.json',
+        },
+        order: [[0, 'desc']]
+    });
+});
+</script>
