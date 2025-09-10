@@ -52,6 +52,19 @@
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
     const userSelect = document.getElementById('usuario_id_calendario');
+    const initialUserId = userSelect ? userSelect.value : '<?= $_SESSION['user_id'] ?>';
+
+    // Função para criar a fonte de eventos dinamicamente
+    const createEventSource = (userId) => ({
+        url: '<?= BASE_URL ?>/ponto/calendarioJson',
+        method: 'GET', // Assegura que o método é GET
+        extraParams: {
+            usuario_id: userId
+        },
+        failure: function() {
+            alert('Houve um erro ao carregar os eventos do calendário!');
+        }
+    });
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
@@ -66,19 +79,13 @@ document.addEventListener('DOMContentLoaded', function() {
             month: 'Mês',
             week: 'Semana'
         },
-        events: {
-            url: '<?= BASE_URL ?>/ponto/calendarioJson',
-            extraParams: function() {
-                // Adiciona o usuario_id aos parâmetros da requisição
-                return {
-                    usuario_id: userSelect ? userSelect.value : '<?= $_SESSION['user_id'] ?>'
-                };
-            }
-        },
+        // Carrega a fonte de eventos inicial
+        eventSources: [ createEventSource(initialUserId) ],
+
         eventClick: function(info) {
             // Preenche o modal com os dados do evento
             const props = info.event.extendedProps;
-            const date = info.event.start.toLocaleDateString('pt-BR');
+            const date = info.event.start.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
             document.getElementById('eventDate').innerText = date;
             document.getElementById('eventStatus').innerText = props.status;
@@ -86,12 +93,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const registrosList = document.getElementById('eventRegistros');
             registrosList.innerHTML = ''; // Limpa a lista
-            props.registros.forEach(r => {
-                const listItem = document.createElement('li');
-                listItem.className = 'list-group-item';
-                listItem.innerText = `${r.tipo}: ${r.hora}`;
-                registrosList.appendChild(listItem);
-            });
+            if (props.registros && props.registros.length > 0) {
+                props.registros.forEach(r => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'list-group-item';
+                    listItem.innerText = `${r.tipo}: ${r.hora}`;
+                    registrosList.appendChild(listItem);
+                });
+            } else {
+                 const listItem = document.createElement('li');
+                 listItem.className = 'list-group-item';
+                 listItem.innerText = 'Nenhum registro detalhado para este dia.';
+                 registrosList.appendChild(listItem);
+            }
 
             const modal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
             modal.show();
@@ -103,7 +117,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Se o filtro de usuário existir, adiciona um listener para recarregar os eventos
     if (userSelect) {
         userSelect.addEventListener('change', function() {
-            calendar.refetchEvents();
+            // Remove a fonte de eventos antiga
+            calendar.getEventSources().forEach(source => source.remove());
+            // Adiciona a nova fonte de eventos com o ID do usuário selecionado
+            calendar.addEventSource(createEventSource(this.value));
         });
     }
 });
