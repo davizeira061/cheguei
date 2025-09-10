@@ -2,17 +2,20 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../models/Ponto.php';
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../models/HorasTrabalhadasService.php'; // Adicionado
 require_once __DIR__ . '/BaseController.php';
 
 class PontoController extends BaseController {
     private $pontoModel;
     private $userModel;
+    private $horasService; // Adicionado
 
     public function __construct() {
         $this->ensureAuthenticated();
         $pdo = getDbConnection();
         $this->pontoModel = new Ponto($pdo);
         $this->userModel = new User($pdo);
+        $this->horasService = new HorasTrabalhadasService(); // Adicionado
     }
 
     public function registrar() {
@@ -51,11 +54,8 @@ class PontoController extends BaseController {
             }
 
         } catch (PDOException $e) {
-            // Em um ambiente de produção, logar o erro em vez de exibi-lo.
-            // error_log("Erro de banco de dados: " . $e->getMessage());
-            $_SESSION['error_message'] = 'Erro no Banco de Dados: Não foi possível registrar o ponto. Verifique se a estrutura da tabela `pontos` está correta.';
+            $_SESSION['error_message'] = 'Erro no Banco de Dados: Não foi possível registrar o ponto.';
         } catch (Exception $e) {
-            // error_log("Erro geral: " . $e->getMessage());
             $_SESSION['error_message'] = 'Ocorreu um erro inesperado. Por favor, tente novamente.';
         }
 
@@ -63,46 +63,33 @@ class PontoController extends BaseController {
     }
 
     private function getUserIP() {
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            return $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            return $_SERVER['HTTP_X_FORWARDED_FOR'];
-        }
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) { return $_SERVER['HTTP_CLIENT_IP']; }
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) { return $_SERVER['HTTP_X_FORWARDED_FOR']; }
         return $_SERVER['REMOTE_ADDR'];
     }
 
     private function getAddressFromCoordinates($lat, $lon) {
-        if (!function_exists('curl_init')) {
-            return "Localização indisponível (cURL não habilitado no servidor)";
-        }
-
-        $url = "https://nominatim.openstreetmap.org/reverse?format=json&lat={$lat}&lon={$lon}&addressdetails=1";
-
+        if (!function_exists('curl_init')) { return "Localização indisponível (cURL não habilitado)"; }
+        $url = "https://nominatim.openstreetmap.org/reverse?format=json&lat={$lat}&lon={$lon}";
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        // É crucial definir um User-Agent para o Nominatim
-        curl_setopt($ch, CURLOPT_USERAGENT, 'ChegueiApp/1.0 (contato@seusite.com)');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'ChegueiApp/1.0');
         $response = curl_exec($ch);
         curl_close($ch);
-
         if ($response) {
             $data = json_decode($response, true);
-            if (isset($data['display_name'])) {
-                return $data['display_name'];
-            }
+            return $data['display_name'] ?? "Endereço não encontrado";
         }
         return "Endereço não encontrado para as coordenadas.";
     }
 
     private function getLocationFromIP($ip) {
-        if (!filter_var($ip, FILTER_VALIDATE_IP) || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-            return "Localização indisponível (IP privado ou inválido)";
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return "Localização indisponível (IP privado)";
         }
-
         $url = "http://ip-api.com/json/{$ip}?lang=pt-BR";
         $response = @file_get_contents($url);
-
         if ($response) {
             $data = json_decode($response, true);
             if ($data && $data['status'] == 'success') {
@@ -113,52 +100,135 @@ class PontoController extends BaseController {
     }
 
     public function meuHistorico() {
-        $userId = $_SESSION['user_id'];
-        $pontos = $this->pontoModel->getPontosByUsuario($userId);
+        // Parâmetros de filtro
+        $usuario_id = $_SESSION['user_id'];
+        $start_date = $_GET['start_date'] ?? date('Y-m-01');
+        $end_date = $_GET['end_date'] ?? date('Y-m-t');
+        $situacao = $_GET['situacao'] ?? 'todos';
+
+        // Busca os pontos e calcula o resumo
+        $pontos = $this->pontoModel->getAllPontos($start_date, $end_date, $usuario_id, 'ASC');
+        $resumo_calculado = $this->horasService->calcularHorasTrabalhadas($pontos);
+
+        // Filtra por situação se necessário
+        if ($situacao !== 'todos') {
+            $resumo_calculado['resumo_diario'] = array_filter(
+                $resumo_calculado['resumo_diario'],
+                fn($dia) => $dia['status'] === $situacao
+            );
+        }
 
         $this->loadView('ponto/meu_historico', [
-            'pontos' => $pontos,
+            'resumo' => $resumo_calculado,
+            'filtros' => ['start_date' => $start_date, 'end_date' => $end_date, 'situacao' => $situacao],
             'pageTitle' => 'Meu Histórico de Pontos'
         ]);
     }
 
     public function relatorioGeral() {
         $this->ensureAdmin();
+
+        // Parâmetros de filtro
         $users = $this->userModel->getAllUsers();
         $usuario_id = $_GET['usuario_id'] ?? null;
-        $start_date = $_GET['start_date'] ?? null;
-        $end_date = $_GET['end_date'] ?? null;
-        $pontos = $this->pontoModel->getAllPontos($start_date, $end_date, $usuario_id);
-        $total_segundos = 0;
-        if ($usuario_id && $start_date && $end_date) {
-            $total_segundos = $this->pontoModel->calculateTotalHoursFromRecords($pontos);
+        $start_date = $_GET['start_date'] ?? date('Y-m-01');
+        $end_date = $_GET['end_date'] ?? date('Y-m-t');
+        $situacao = $_GET['situacao'] ?? 'todos';
+
+        // Inicializa variáveis
+        $resumo_calculado = [
+            'resumo_diario' => [],
+            'total_segundos_periodo' => 0,
+            'banco_horas_saldo_periodo' => 0,
+        ];
+
+        if ($usuario_id) {
+            // Busca os pontos e calcula o resumo
+            $pontos = $this->pontoModel->getAllPontos($start_date, $end_date, $usuario_id, 'ASC');
+            $resumo_calculado = $this->horasService->calcularHorasTrabalhadas($pontos);
+
+            // Filtra por situação se necessário
+            if ($situacao !== 'todos') {
+                $resumo_calculado['resumo_diario'] = array_filter(
+                    $resumo_calculado['resumo_diario'],
+                    fn($dia) => $dia['status'] === $situacao
+                );
+            }
         }
-        $total_horas_formatado = '';
-        if ($total_segundos > 0) {
-            $horas = floor($total_segundos / 3600);
-            $minutos = floor(($total_segundos % 3600) / 60);
-            $total_horas_formatado = sprintf('%02d:%02d', $horas, $minutos);
-        }
-        if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-            $this->exportCsv($pontos);
-        }
+
         $this->loadView('ponto/relatorio', [
-            'pontos' => $pontos,
             'users' => $users,
-            'total_horas_formatado' => $total_horas_formatado,
+            'resumo' => $resumo_calculado,
+            'filtros' => ['usuario_id' => $usuario_id, 'start_date' => $start_date, 'end_date' => $end_date, 'situacao' => $situacao],
             'pageTitle' => 'Relatório Geral de Pontos'
         ]);
     }
 
-    private function exportCsv($pontos) {
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=relatorio_pontos.csv');
-        $output = fopen('php://output', 'w');
-        fputcsv($output, ['ID Ponto', 'ID Usuario', 'Nome Usuario', 'Data/Hora', 'Tipo'], ';');
-        foreach ($pontos as $p) {
-            fputcsv($output, [$p['id'], $p['usuario_id'], $p['usuario_nome'], $p['data_hora'], $p['tipo']], ';');
+    public function calendario() {
+        $users = [];
+        // Se for admin, busca todos os usuários para o filtro
+        if ($_SESSION['user_perfil'] === 'admin') {
+            $users = $this->userModel->getAllUsers();
         }
-        fclose($output);
+
+        $this->loadView('ponto/calendario', [
+            'users' => $users,
+            'pageTitle' => 'Calendário de Pontos'
+        ]);
+    }
+
+    public function calendarioJson() {
+        header('Content-Type: application/json');
+
+        $start_date = $_GET['start'] ?? date('Y-m-01');
+        $end_date = $_GET['end'] ?? date('Y-m-t');
+
+        // Admin pode ver outros usuários, colaborador só pode ver a si mesmo
+        if ($_SESSION['user_perfil'] === 'admin') {
+            $usuario_id = $_GET['usuario_id'] ?? $_SESSION['user_id'];
+        } else {
+            $usuario_id = $_SESSION['user_id'];
+        }
+
+        $pontos = $this->pontoModel->getAllPontos($start_date, $end_date, $usuario_id, 'ASC');
+        $resumo = $this->horasService->calcularHorasTrabalhadas($pontos);
+
+        $events = [];
+        foreach ($resumo['resumo_diario'] as $data => $dia) {
+            $total_horas_formatado = $this->formatarSegundos($dia['total_segundos_trabalhados']);
+
+            $event_title = "Horas: " . $total_horas_formatado;
+            $event_color = $dia['status'] === 'completo' ? '#28a745' : '#ffc107';
+
+            $events[] = [
+                'title' => $event_title,
+                'start' => $data,
+                'backgroundColor' => $event_color,
+                'borderColor' => $event_color,
+                'extendedProps' => [
+                    'status' => ucfirst($dia['status']),
+                    'saldo' => $this->formatarSegundos($dia['banco_horas_saldo']),
+                    'registros' => array_map(fn($r) => [
+                        'tipo' => ucfirst(str_replace('_', ' ', $r['tipo'])),
+                        'hora' => date('H:i:s', strtotime($r['data_hora']))
+                    ], $dia['registros'])
+                ]
+            ];
+        }
+
+        echo json_encode($events);
         exit;
+    }
+
+    private function formatarSegundos($total_segundos) {
+        if ($total_segundos < 0) {
+            $sinal = '-';
+            $total_segundos = abs($total_segundos);
+        } else {
+            $sinal = '';
+        }
+        $horas = floor($total_segundos / 3600);
+        $minutos = floor(($total_segundos % 3600) / 60);
+        return sprintf('%s%02d:%02d', $sinal, $horas, $minutos);
     }
 }
